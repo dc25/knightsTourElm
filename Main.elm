@@ -6,7 +6,7 @@ import Svg
 import List.Extra as LE exposing (andThen)
 import Signal exposing (..)
 import Svg.Events exposing (onClick)
-import Svg.Attributes exposing (version, viewBox, cx, cy, r, x, y, x1, y1, x2, y2, fill,points, style, width, height, preserveAspectRatio)
+import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, style, width, height)
 
 w = 500
 h = 500
@@ -54,7 +54,9 @@ view address model =
                      ]
                      [] 
 
-        checkers rows cols = List.concatMap (\at -> List.map (showChecker at) [0..cols-1]) [0..rows-1]
+        checkers rows cols = [0..rows-1] `LE.andThen` \r ->
+                             [0..cols-1] `LE.andThen` \c ->
+                             [showChecker r c]
 
         moves pts = case List.tail pts of
             Nothing -> []
@@ -122,6 +124,6 @@ tickSignal = (every (dt * second)) |> Signal.map (\t -> Tick (round t))
 
 actionSignal = Signal.mergeMany [tickSignal, control.signal]
 
-modelSignal = Signal.foldp update (init 8 8 ) actionSignal
+modelSignal = Signal.foldp update (init 8 8) actionSignal
 
 main = Signal.map (view control.address) modelSignal 
