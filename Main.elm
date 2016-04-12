@@ -1,15 +1,15 @@
-import Html exposing (..)
+import Html as H
 import String exposing (join)
 import Html.Attributes as HA
 import Time exposing (every, second)
 import Svg 
 import List.Extra as LE exposing (andThen)
-import Signal exposing (..)
+import Signal 
 import Svg.Events exposing (onClick)
 import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, style, width, height)
 
-w = 500
-h = 500
+w = 450
+h = 450
 dt = 0.03
 
 type alias Cell = (Int, Int)
@@ -40,7 +40,7 @@ view address model =
                      , width "1"
                      , height "1"
                      , fill <| if (row + col) % 2 == 0 then "blue" else "grey"
-                     , onClick <| message address <| SetStart (row, col)
+                     , onClick <| Signal.message address <| SetStart (row, col)
                      ]
                      [] 
 
@@ -49,7 +49,7 @@ view address model =
                      , y1 <| toString ((fst pt0 |> toFloat) + 0.5)
                      , x2 <| toString ((snd pt1 |> toFloat) + 0.5)
                      , y2 <| toString ((fst pt1 |> toFloat) + 0.5)
-                     , style "stroke:black;stroke-width:0.05" 
+                     , style "stroke:yellow;stroke-width:0.05" 
                      ]
                      [] 
 
@@ -64,11 +64,12 @@ view address model =
         unvisited = List.length model.board - List.length model.path
 
     in 
-        div 
+        H.div 
           []
-          [ h2 [center] [text "Knight's Tour"]
-          , h2 [center] [text <| "Unvisited count : " ++ toString unvisited ]
-          , div 
+          [ H.h2 [center] [H.text "Knight's Tour"]
+          , H.h2 [center] [H.text <| "Unvisited count : " ++ toString unvisited ]
+          , H.h2 [center] [H.text "(pick a square)"]
+          , H.div 
               [center] 
               [ Svg.svg 
                   [ version "1.1"
@@ -84,8 +85,8 @@ view address model =
               ]
           ] 
 
-knightMoves : Model -> Cell -> List Cell
-knightMoves model startCell = 
+nextMoves : Model -> Cell -> List Cell
+nextMoves model startCell = 
   let c = [ 1,  2, -1, -2]
       km = c `LE.andThen` \cx -> 
            c `LE.andThen` \cy -> 
@@ -93,11 +94,11 @@ knightMoves model startCell =
       jumps = List.map (\cell -> (fst cell + fst startCell, snd cell + snd startCell)) km
   in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
-nextMove : Model -> Maybe Cell
-nextMove model = 
+bestMove : Model -> Maybe Cell
+bestMove model = 
     case List.head (model.path) of
         Nothing -> Nothing
-        Just mph -> LE.minimumBy (List.length << knightMoves model) (knightMoves model mph)
+        Just mph -> LE.minimumBy (List.length << nextMoves model) (nextMoves model mph)
 
 update action model =
     case action of
@@ -107,7 +108,7 @@ update action model =
             if (model.path == []) then 
                model
            else
-               case nextMove model of
+               case bestMove model of
                    Nothing -> model
                    Just nm -> {model | path = nm :: model.path }
         NoOp -> model
@@ -120,6 +121,6 @@ tickSignal = (every (dt * second)) |> Signal.map (\t -> Tick (round t))
 
 actionSignal = Signal.mergeMany [tickSignal, control.signal]
 
-modelSignal = Signal.foldp update (init 16 16) actionSignal
+modelSignal = Signal.foldp update (init 12 12) actionSignal
 
 main = Signal.map (view control.address) modelSignal 
