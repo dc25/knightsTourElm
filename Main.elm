@@ -85,16 +85,12 @@ view address model =
 
 knightMoves : Model -> Cell -> List Cell
 knightMoves model startCell = 
-  let km    = [ ( 1,  2)
-              , ( 1, -2)
-              , (-1,  2)
-              , (-1, -2)
-              , ( 2,  1)
-              , ( 2, -1)
-              , (-2,  1)
-              , (-2, -1) 
-              ]
+  let c = [ 1,  2, -1, -2]
+      km = c `LE.andThen` \cx -> 
+           c `LE.andThen` \cy -> 
+           if abs(cx) == abs(cy) then [] else [(cx,cy)]
       jumps = List.map (\cell -> (fst cell + fst startCell, snd cell + snd startCell)) km
+
   in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
 nextMove : Model -> Maybe Cell
