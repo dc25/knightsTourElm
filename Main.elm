@@ -3,17 +3,14 @@ import String exposing (join)
 import Html.Attributes as HA
 import Time exposing (every, second)
 import Svg 
+import List.Extra as LE exposing (andThen)
 import Signal exposing (..)
 import Svg.Events exposing (onClick)
 import Svg.Attributes exposing (version, viewBox, cx, cy, r, x, y, x1, y1, x2, y2, fill,points, style, width, height, preserveAspectRatio)
 
 w = 500
 h = 500
-dt = 0.5
-
--- Taken verbatim from comments in : https://github.com/elm-lang/elm-compiler/issues/147
-andMap : List (a -> b) -> List a -> List b -- like (<*>) in Haskell, specialised to lists
-andMap listOfFuncs listOfAs = List.concatMap (\f -> List.map f listOfAs) listOfFuncs
+dt = 0.01
 
 type alias Cell = (Int, Int)
 
@@ -24,14 +21,14 @@ type alias Model =
     , board : List Cell
     }
 
-model rc cc = 
-        { rows=rc
-        , cols=cc
-        , path = []
-        , board = List.map (\r c -> {row=r, col=c}) [0..rc-1] `andMap` [0..cc-1]
-        }
-
-init = model
+init rc cc = 
+    { rows=rc
+    , cols=cc
+    , path = []
+    , board = [0..rc-1] `LE.andThen` \r ->
+              [0..cc-1] `LE.andThen` \c ->
+              [(r, c)]
+    }
 
 floatLeft = HA.style [ ("float", "left") ] 
 centerTitle = HA.style [ ( "text-align", "center") ] 
@@ -39,21 +36,35 @@ centerTitle = HA.style [ ( "text-align", "center") ]
 view address model = 
     let
         showChecker row col = 
-            Svg.rect [ x <| toString col, 
-                       y <| toString row, 
-                       width "1", 
-                       height "1", 
-                       fill <| if (row + col) % 2 == 0 then "blue" else "grey", 
-                       onClick <| message address <| SetStart (row, col)
+            Svg.rect [ x <| toString col
+                     , y <| toString row 
+                     , width "1"
+                     , height "1"
+                     , fill <| if (row + col) % 2 == 0 then "blue" else "grey"
+                     , onClick <| message address <| SetStart (row, col)
+                     ]
+                     [] 
+
+        showMove pt0 pt1 = 
+            Svg.line [ x1 <| toString ((snd pt0 |> toFloat) + 0.5)
+                     , y1 <| toString ((fst pt0 |> toFloat) + 0.5)
+                     , x2 <| toString ((snd pt1 |> toFloat) + 0.5)
+                     , y2 <| toString ((fst pt1 |> toFloat) + 0.5)
+                     , style "stroke:black;stroke-width:0.05" 
                      ]
                      [] 
 
         checkers rows cols = List.concatMap (\at -> List.map (showChecker at) [0..cols-1]) [0..rows-1]
 
+        moves pts = case List.tail pts of
+            Nothing -> []
+            Just tl -> List.map2 showMove pts tl
+
     in 
         div 
           []
           [ h2 [centerTitle] [text "Knights Tour"]
+          , h2 [centerTitle] [text (toString (List.length model.path))]
           , div 
               [centerTitle] 
               [ Svg.svg 
@@ -66,7 +77,7 @@ view address model =
                                , model.cols |> toString
                                , model.rows |> toString ])
                   ] 
-                  [ Svg.g [] <| checkers model.rows model.cols]
+                  [ Svg.g [] <| checkers model.rows model.cols ++ moves model.path]
               ]
           ] 
 
@@ -82,21 +93,13 @@ knightMoves model startCell =
               , (-2, -1) 
               ]
       jumps = List.map (\cell -> (fst cell + fst startCell, snd cell + snd startCell)) km
-  in List.filter (flip List.member model.board) jumps
+  in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
 nextMove : Model -> Maybe Cell
 nextMove model = 
-    let 
-        findMoves sq = List.filter (\mv -> not <| (flip List.member) (model.path) mv) (knightMoves model sq) 
-        candMoves = case List.head (model.path) of
-            Nothing -> []
-            Just mph -> findMoves mph
-        nextMovesLength = List.map (\mv -> (findMoves mv |> List.length, mv)) candMoves
-        bestMove = List.minimum nextMovesLength 
-    in 
-       case bestMove of
-           Nothing -> Nothing
-           Just nm -> Just (snd nm)
+    case List.head (model.path) of
+        Nothing -> Nothing
+        Just mph -> LE.minimumBy (List.length << knightMoves model) (knightMoves model mph)
 
 update action model =
     case action of
@@ -106,7 +109,9 @@ update action model =
             if (model.path == []) then 
                model
            else
-               model
+               case nextMove model of
+                   Nothing -> model
+                   Just nm -> {model | path = nm :: model.path }
         NoOp -> model
 
 control = Signal.mailbox NoOp
