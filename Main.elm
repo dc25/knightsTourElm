@@ -10,7 +10,7 @@ import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, st
 
 w = 500
 h = 500
-dt = 0.01
+dt = 0.03
 
 type alias Cell = (Int, Int)
 
@@ -30,8 +30,7 @@ init rc cc =
               [(r, c)]
     }
 
-floatLeft = HA.style [ ("float", "left") ] 
-centerTitle = HA.style [ ( "text-align", "center") ] 
+center = HA.style [ ( "text-align", "center") ] 
 
 view address model = 
     let
@@ -54,21 +53,23 @@ view address model =
                      ]
                      [] 
 
-        checkers rows cols = [0..rows-1] `LE.andThen` \r ->
-                             [0..cols-1] `LE.andThen` \c ->
-                             [showChecker r c]
+        checkers model = [0..model.rows-1] `LE.andThen` \r ->
+                         [0..model.cols-1] `LE.andThen` \c ->
+                         [showChecker r c]
 
-        moves pts = case List.tail pts of
+        moves model = case List.tail model.path of
             Nothing -> []
-            Just tl -> List.map2 showMove pts tl
+            Just tl -> List.map2 showMove model.path tl
+
+        unvisited = List.length model.board - List.length model.path
 
     in 
         div 
           []
-          [ h2 [centerTitle] [text "Knights Tour"]
-          , h2 [centerTitle] [text (toString (List.length model.path))]
+          [ h2 [center] [text "Knight's Tour"]
+          , h2 [center] [text <| "Unvisited count : " ++ toString unvisited ]
           , div 
-              [centerTitle] 
+              [center] 
               [ Svg.svg 
                   [ version "1.1"
                   , width (toString w)
@@ -79,7 +80,7 @@ view address model =
                                , model.cols |> toString
                                , model.rows |> toString ])
                   ] 
-                  [ Svg.g [] <| checkers model.rows model.cols ++ moves model.path]
+                  [ Svg.g [] <| checkers model ++ moves model ]
               ]
           ] 
 
@@ -90,7 +91,6 @@ knightMoves model startCell =
            c `LE.andThen` \cy -> 
            if abs(cx) == abs(cy) then [] else [(cx,cy)]
       jumps = List.map (\cell -> (fst cell + fst startCell, snd cell + snd startCell)) km
-
   in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
 nextMove : Model -> Maybe Cell
@@ -120,6 +120,6 @@ tickSignal = (every (dt * second)) |> Signal.map (\t -> Tick (round t))
 
 actionSignal = Signal.mergeMany [tickSignal, control.signal]
 
-modelSignal = Signal.foldp update (init 8 8) actionSignal
+modelSignal = Signal.foldp update (init 16 16) actionSignal
 
 main = Signal.map (view control.address) modelSignal 
