@@ -10,23 +10,21 @@ import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, st
 
 w = 450
 h = 450
+rowCount=12
+colCount=12
 dt = 0.03
 
 type alias Cell = (Int, Int)
 
 type alias Model = 
-    { rows : Int
-    , cols : Int
-    , path : List Cell
+    { path : List Cell
     , board : List Cell
     }
 
-init rc cc = 
-    { rows=rc
-    , cols=cc
-    , path = []
-    , board = [0..rc-1] `LE.andThen` \r ->
-              [0..cc-1] `LE.andThen` \c ->
+init = 
+    { path = []
+    , board = [0..rowCount-1] `LE.andThen` \r ->
+              [0..colCount-1] `LE.andThen` \c ->
               [(r, c)]
     }
 
@@ -53,8 +51,7 @@ view address model =
                      ]
                      [] 
 
-        checkers model = [0..model.rows-1] `LE.andThen` \r ->
-                         [0..model.cols-1] `LE.andThen` \c ->
+        checkers model = model.board `LE.andThen` \(r,c) ->
                          [showChecker r c]
 
         moves model = case List.tail model.path of
@@ -76,10 +73,10 @@ view address model =
                   , width (toString w)
                   , height (toString h)
                   , viewBox (join " " 
-                               [ 0          |> toString
-                               , 0          |> toString
-                               , model.cols |> toString
-                               , model.rows |> toString ])
+                               [ toString 0        
+                               , toString 0        
+                               , toString rowCount 
+                               , toString colCount ])
                   ] 
                   [ Svg.g [] <| checkers model ++ moves model ]
               ]
@@ -118,9 +115,8 @@ control = Signal.mailbox NoOp
 type Action = NoOp | Tick Int | SetStart Cell
 
 tickSignal = (every (dt * second)) |> Signal.map (\t -> Tick (round t)) 
-
 actionSignal = Signal.mergeMany [tickSignal, control.signal]
 
-modelSignal = Signal.foldp update (init 12 12) actionSignal
+modelSignal = Signal.foldp update init actionSignal
 
 main = Signal.map (view control.address) modelSignal 
