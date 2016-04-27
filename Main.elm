@@ -21,12 +21,14 @@ type alias Model =
     , board : List Cell
     }
 
-init = 
-    { path = []
-    , board = [0..rowCount-1] `LE.andThen` \r ->
-              [0..colCount-1] `LE.andThen` \c ->
-              [(r, c)]
-    }
+type Action = NoOp | Tick Int | SetStart Cell
+
+initModel = 
+    let path = []
+        board = [0..rowCount-1] `LE.andThen` \r ->
+                [0..colCount-1] `LE.andThen` \c ->
+                [(r, c)]
+    in Model path board
 
 center = HA.style [ ( "text-align", "center") ] 
 
@@ -43,20 +45,21 @@ view address model =
                      [] 
 
         showMove pt0 pt1 = 
-            Svg.line [ x1 <| toString ((snd pt0 |> toFloat) + 0.5)
-                     , y1 <| toString ((fst pt0 |> toFloat) + 0.5)
-                     , x2 <| toString ((snd pt1 |> toFloat) + 0.5)
-                     , y2 <| toString ((fst pt1 |> toFloat) + 0.5)
+            Svg.line [ x1 <| toString ((toFloat <| snd pt0) + 0.5)
+                     , y1 <| toString ((toFloat <| fst pt0) + 0.5)
+                     , x2 <| toString ((toFloat <| snd pt1) + 0.5)
+                     , y2 <| toString ((toFloat <| fst pt1) + 0.5)
                      , style "stroke:yellow;stroke-width:0.05" 
                      ]
                      [] 
 
-        checkers model = model.board `LE.andThen` \(r,c) ->
-                         [showChecker r c]
-
-        moves model = case List.tail model.path of
-            Nothing -> []
-            Just tl -> List.map2 showMove model.path tl
+        render model =
+            let checkers = model.board `LE.andThen` \(r,c) ->
+                           [showChecker r c]
+                moves = case List.tail model.path of
+                        Nothing -> []
+                        Just tl -> List.map2 showMove model.path tl
+            in checkers ++ moves
 
         unvisited = List.length model.board - List.length model.path
 
@@ -78,17 +81,20 @@ view address model =
                                , toString rowCount 
                                , toString colCount ])
                   ] 
-                  [ Svg.g [] <| checkers model ++ moves model ]
+                  [ Svg.g [] <| render model]
               ]
           ] 
 
 nextMoves : Model -> Cell -> List Cell
 nextMoves model startCell = 
   let c = [ 1,  2, -1, -2]
+
       km = c `LE.andThen` \cx -> 
            c `LE.andThen` \cy -> 
            if abs(cx) == abs(cy) then [] else [(cx,cy)]
+
       jumps = List.map (\cell -> (fst cell + fst startCell, snd cell + snd startCell)) km
+
   in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
 bestMove : Model -> Maybe Cell
@@ -102,21 +108,17 @@ update action model =
         SetStart start -> 
             {model |  path = [start]} 
         Tick t ->  
-            if (model.path == []) then 
-               model
-           else
-               case bestMove model of
-                   Nothing -> model
-                   Just nm -> {model | path = nm :: model.path }
+            if (model.path == []) then model
+            else case bestMove model of
+                     Nothing -> model
+                     Just best -> {model | path = best::model.path }
         NoOp -> model
 
 control = Signal.mailbox NoOp
 
-type Action = NoOp | Tick Int | SetStart Cell
-
 tickSignal = (every (dt * second)) |> Signal.map (\t -> Tick (round t)) 
 actionSignal = Signal.mergeMany [tickSignal, control.signal]
 
-modelSignal = Signal.foldp update init actionSignal
+modelSignal = Signal.foldp update initModel actionSignal
 
 main = Signal.map (view control.address) modelSignal 
