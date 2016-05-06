@@ -24,13 +24,11 @@ type alias Model =
 type Action = NoOp | Tick Int | SetStart Cell
 
 initModel = 
-    let path = []
-        board = [0..rowCount-1] `LE.andThen` \r ->
+    let board = [0..rowCount-1] `LE.andThen` \r ->
                 [0..colCount-1] `LE.andThen` \c ->
                 [(r, c)]
+        path = []
     in Model path board
-
-center = HA.style [ ( "text-align", "center") ] 
 
 view address model = 
     let
@@ -63,6 +61,8 @@ view address model =
 
         unvisited = List.length model.board - List.length model.path
 
+        center = HA.style [ ( "text-align", "center") ] 
+
     in 
         H.div 
           []
@@ -86,14 +86,14 @@ view address model =
           ] 
 
 nextMoves : Model -> Cell -> List Cell
-nextMoves model startCell = 
+nextMoves model (stx,sty) = 
   let c = [ 1,  2, -1, -2]
 
       km = c `LE.andThen` \cx -> 
            c `LE.andThen` \cy -> 
            if abs(cx) == abs(cy) then [] else [(cx,cy)]
 
-      jumps = List.map (\cell -> (fst cell + fst startCell, snd cell + snd startCell)) km
+      jumps = List.map (\(cex,cey) -> (cex + stx, cey + sty)) km
 
   in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
@@ -108,8 +108,9 @@ update action model =
         SetStart start -> 
             {model |  path = [start]} 
         Tick t ->  
-            if (model.path == []) then model
-            else case bestMove model of
+            case model.path of
+            [] -> model
+            _ -> case bestMove model of
                      Nothing -> model
                      Just best -> {model | path = best::model.path }
         NoOp -> model
