@@ -2,7 +2,7 @@ import Html as H
 import String exposing (join)
 import Html.Attributes as HA
 import Time exposing (every, second)
-import Svg 
+import Svg  
 import List.Extra as LE exposing (andThen)
 import Signal 
 import Svg.Events exposing (onClick)
@@ -109,10 +109,10 @@ update action model =
             {model |  path = [start]} 
         Tick t ->  
             case model.path of
-            [] -> model
-            _ -> case bestMove model of
-                     Nothing -> model
-                     Just best -> {model | path = best::model.path }
+                [] -> model
+                _ -> case bestMove model of
+                         Nothing -> model
+                         Just best -> {model | path = best::model.path }
         NoOp -> model
 
 control = Signal.mailbox NoOp
