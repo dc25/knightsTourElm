@@ -2,7 +2,7 @@ import Html as H
 import String exposing (join)
 import Html.Attributes as HA
 import Time exposing (every, second)
-import Svg  
+import Svg exposing (rect, line, svg, g)
 import List.Extra as LE exposing (andThen)
 import Signal 
 import Svg.Events exposing (onClick)
@@ -10,8 +10,8 @@ import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, st
 
 w = 450
 h = 450
-rowCount=12
-colCount=12
+rowCount=20
+colCount=20
 dt = 0.03
 
 type alias Cell = (Int, Int)
@@ -33,23 +33,23 @@ initModel =
 view address model = 
     let
         showChecker row col = 
-            Svg.rect [ x <| toString col
-                     , y <| toString row 
-                     , width "1"
-                     , height "1"
-                     , fill <| if (row + col) % 2 == 0 then "blue" else "grey"
-                     , onClick <| Signal.message address <| SetStart (row, col)
-                     ]
-                     [] 
+            rect [ x <| toString col
+                 , y <| toString row 
+                 , width "1"
+                 , height "1"
+                 , fill <| if (row + col) % 2 == 0 then "blue" else "grey"
+                 , onClick <| Signal.message address <| SetStart (row, col)
+                 ]
+                 [] 
 
-        showMove pt0 pt1 = 
-            Svg.line [ x1 <| toString ((toFloat <| snd pt0) + 0.5)
-                     , y1 <| toString ((toFloat <| fst pt0) + 0.5)
-                     , x2 <| toString ((toFloat <| snd pt1) + 0.5)
-                     , y2 <| toString ((toFloat <| fst pt1) + 0.5)
-                     , style "stroke:yellow;stroke-width:0.05" 
-                     ]
-                     [] 
+        showMove (row0,col0) (row1,col1) = 
+            line [ x1 <| toString ((toFloat col0) + 0.5)
+                 , y1 <| toString ((toFloat row0) + 0.5)
+                 , x2 <| toString ((toFloat col1) + 0.5)
+                 , y2 <| toString ((toFloat row1) + 0.5)
+                 , style "stroke:yellow;stroke-width:0.05" 
+                 ]
+                 [] 
 
         render model =
             let checkers = model.board `LE.andThen` \(r,c) ->
@@ -71,29 +71,29 @@ view address model =
           , H.h2 [center] [H.text "(pick a square)"]
           , H.div 
               [center] 
-              [ Svg.svg 
+              [ svg 
                   [ version "1.1"
                   , width (toString w)
                   , height (toString h)
                   , viewBox (join " " 
                                [ toString 0        
                                , toString 0        
-                               , toString rowCount 
-                               , toString colCount ])
+                               , toString colCount 
+                               , toString rowCount ])
                   ] 
-                  [ Svg.g [] <| render model]
+                  [ g [] <| render model]
               ]
           ] 
 
 nextMoves : Model -> Cell -> List Cell
-nextMoves model (stx,sty) = 
+nextMoves model (stRow,stCol) = 
   let c = [ 1,  2, -1, -2]
 
-      km = c `LE.andThen` \cx -> 
-           c `LE.andThen` \cy -> 
-           if abs(cx) == abs(cy) then [] else [(cx,cy)]
+      km = c `LE.andThen` \cRow -> 
+           c `LE.andThen` \cCol -> 
+           if abs(cRow) == abs(cCol) then [] else [(cRow,cCol)]
 
-      jumps = List.map (\(cex,cey) -> (cex + stx, cey + sty)) km
+      jumps = List.map (\(kmRow,kmCol) -> (kmRow + stRow, kmCol + stCol)) km
 
   in List.filter (\j -> List.member j model.board && not (List.member j model.path) ) jumps
 
