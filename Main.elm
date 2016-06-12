@@ -1,25 +1,13 @@
-import Html as H
 import List exposing (concatMap, foldl, head,member,filter,length,minimum,concat,map,map2,tail)
-import Maybe as M 
+import List.Extra exposing (minimumBy, andThen)
 import String exposing (join)
-import Html exposing (Html)
+import Html as H 
 import Html.Attributes as HA
 import Html.App exposing (program)
 import Time exposing (Time,every, second)
 import Svg exposing (rect, line, svg, g)
 import Svg.Events exposing (onClick)
 import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, style, width, height)
-
-minimumBy : (a -> comparable) -> List a -> Maybe a
-minimumBy f ls =
-  let minBy x (y, fy) = let fx = f x in if fx < fy then (x, fx) else (y, fy)
-  in case ls of
-        [l']    -> Just l'
-        l'::ls' -> Just <| fst <| foldl minBy (l', f l') ls'
-        _       -> Nothing
-
-andThen : List a -> (a -> List b) -> List b
-andThen = flip concatMap
 
 w = 450
 h = 450
@@ -44,7 +32,7 @@ init =
         path = []
     in (Model path board, Cmd.none)
 
-view : Model -> Html Msg
+view : Model -> H.Html Msg
 view model = 
     let
         showChecker row col = 
