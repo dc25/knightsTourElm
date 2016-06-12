@@ -1,12 +1,25 @@
 import Html as H
+import List exposing (concatMap, foldl, head,member,filter,length,minimum,concat,map,map2,tail)
+import Maybe as M 
 import String exposing (join)
+import Html exposing (Html)
 import Html.Attributes as HA
-import Time exposing (every, second)
+import Html.App exposing (program)
+import Time exposing (Time,every, second)
 import Svg exposing (rect, line, svg, g)
-import List.Extra as LE exposing (andThen)
-import Signal 
 import Svg.Events exposing (onClick)
 import Svg.Attributes exposing (version, viewBox, x, y, x1, y1, x2, y2, fill, style, width, height)
+
+minimumBy : (a -> comparable) -> List a -> Maybe a
+minimumBy f ls =
+  let minBy x (y, fy) = let fx = f x in if fx < fy then (x, fx) else (y, fy)
+  in case ls of
+        [l']    -> Just l'
+        l'::ls' -> Just <| fst <| foldl minBy (l', f l') ls'
+        _       -> Nothing
+
+andThen : List a -> (a -> List b) -> List b
+andThen = flip concatMap
 
 w = 450
 h = 450
@@ -21,16 +34,18 @@ type alias Model =
     , board : List Cell
     }
 
-type Action = NoOp | Tick Int | SetStart Cell
+type Msg = NoOp | Tick Time | SetStart Cell
 
-initModel = 
-    let board = [0..rowCount-1] `LE.andThen` \r ->
-                [0..colCount-1] `LE.andThen` \c ->
+init : (Model,Cmd Msg)
+init = 
+    let board = [0..rowCount-1] `andThen` \r ->
+                [0..colCount-1] `andThen` \c ->
                 [(r, c)]
         path = []
-    in Model path board
+    in (Model path board, Cmd.none)
 
-view address model = 
+view : Model -> Html Msg
+view model = 
     let
         showChecker row col = 
             rect [ x <| toString col
@@ -38,7 +53,7 @@ view address model =
                  , width "1"
                  , height "1"
                  , fill <| if (row + col) % 2 == 0 then "blue" else "grey"
-                 , onClick <| Signal.message address <| SetStart (row, col)
+                 , onClick <| SetStart (row, col)
                  ]
                  [] 
 
@@ -52,14 +67,14 @@ view address model =
                  [] 
 
         render model =
-            let checkers = model.board `LE.andThen` \(r,c) ->
+            let checkers = model.board `andThen` \(r,c) ->
                            [showChecker r c]
                 moves = case List.tail model.path of
                         Nothing -> []
                         Just tl -> List.map2 showMove model.path tl
             in checkers ++ moves
 
-        unvisited = List.length model.board - List.length model.path
+        unvisited = length model.board - length model.path
 
         center = HA.style [ ( "text-align", "center") ] 
 
@@ -89,8 +104,8 @@ nextMoves : Model -> Cell -> List Cell
 nextMoves model (stRow,stCol) = 
   let c = [ 1,  2, -1, -2]
 
-      km = c `LE.andThen` \cRow -> 
-           c `LE.andThen` \cCol -> 
+      km = c `andThen` \cRow -> 
+           c `andThen` \cCol -> 
            if abs(cRow) == abs(cCol) then [] else [(cRow,cCol)]
 
       jumps = List.map (\(kmRow,kmCol) -> (kmRow + stRow, kmCol + stCol)) km
@@ -101,25 +116,30 @@ bestMove : Model -> Maybe Cell
 bestMove model = 
     case List.head (model.path) of
         Nothing -> Nothing
-        Just mph -> LE.minimumBy (List.length << nextMoves model) (nextMoves model mph)
+        Just mph -> minimumBy (List.length << nextMoves model) (nextMoves model mph)
 
-update action model =
-    case action of
-        SetStart start -> 
-            {model |  path = [start]} 
-        Tick t ->  
-            case model.path of
-                [] -> model
-                _ -> case bestMove model of
-                         Nothing -> model
-                         Just best -> {model | path = best::model.path }
-        NoOp -> model
+update : Msg -> Model -> (Model, Cmd Msg)
+update msg model =
+    let mo = case msg of
+                 SetStart start -> 
+                     {model |  path = [start]} 
+                 Tick t ->  
+                     case model.path of
+                         [] -> model
+                         _ -> case bestMove model of
+                                  Nothing -> model
+                                  Just best -> {model | path = best::model.path }
+                 NoOp -> model
+    in (mo, Cmd.none)
 
-control = Signal.mailbox NoOp
+subscriptions : Model -> Sub Msg
+subscriptions _ = 
+    Time.every (dt * second) Tick 
 
-tickSignal = (every (dt * second)) |> Signal.map (\t -> Tick (round t)) 
-actionSignal = Signal.mergeMany [tickSignal, control.signal]
-
-modelSignal = Signal.foldp update initModel actionSignal
-
-main = Signal.map (view control.address) modelSignal 
+main =
+  program 
+      { init = init
+      , view = view
+      , update = update
+      , subscriptions = subscriptions
+      }
